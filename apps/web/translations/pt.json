@@ -2047,7 +2047,13 @@
       "title": "Nenhum modelo disponível",
       "description": "Conecte seu próprio provedor para começar a usar esta sessão.",
       "upgradeDescription": "Faça upgrade ou conecte seu próprio provedor para começar a usar esta sessão."
-    }
+    },
+    "favorites": "Favoritos",
+    "favoritesEmpty": "Marque um modelo com estrela para mantê-lo aqui.",
+    "addFavorite": "Adicionar {model} aos favoritos",
+    "removeFavorite": "Remover {model} dos favoritos",
+    "groups": "Grupos de modelos",
+    "thinking": "Raciocínio"
   },
   "sessionScope": {
     "resetDefault": "Redefinir para o padrão",

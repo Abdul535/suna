@@ -2047,7 +2047,13 @@
       "title": "利用できるモデルがありません",
       "description": "自分のプロバイダーに接続すると、このセッションを利用できます。",
       "upgradeDescription": "アップグレードするか、自分のプロバイダーに接続すると、このセッションを利用できます。"
-    }
+    },
+    "favorites": "お気に入り",
+    "favoritesEmpty": "モデルにスターを付けるとここに表示されます。",
+    "addFavorite": "{model} をお気に入りに追加",
+    "removeFavorite": "{model} をお気に入りから削除",
+    "groups": "モデルグループ",
+    "thinking": "思考"
   },
   "sessionScope": {
     "resetDefault": "デフォルトに戻す",
