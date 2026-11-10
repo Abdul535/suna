@@ -1,6 +1,6 @@
 'use server';
 
-import { AUTH_TIMEOUT_AUTH_ERROR, AUTH_UPSTREAM_TIMEOUT_MS } from '@/lib/auth/submit-auth';
+import { AUTH_TIMEOUT_MESSAGE, AUTH_UPSTREAM_TIMEOUT_MS } from '@/lib/auth/submit-auth';
 import { settleWithin } from '@/lib/deadline';
 import { buildMobileSessionHandoffUrl } from '@/lib/auth/mobile-handoff';
 import {
@@ -21,6 +21,7 @@ import {
 } from '@/lib/auth/unified-auth-flow';
 import { AUTH_BOUNCE_COOKIE, parseAuthBounceOwner } from '@kortix/ui/internal/lib/onboarding/landing-destination';
 import { getServerPublicEnv } from '@/lib/public-env-server';
+import { AuthApiError } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { checkAccessEmail, submitAccessRequest } from '@kortix/sdk';
 import { getTranslations } from '@/i18n/get-translations';
@@ -35,6 +36,21 @@ import { cookies, headers } from 'next/headers';
  */
 async function readBouncedOwnerId(): Promise<string> {
   return parseAuthBounceOwner((await cookies()).get(AUTH_BOUNCE_COOKIE)?.value);
+}
+
+/**
+ * The error a bounded GoTrue await resolves with when the deadline fires: a
+ * real AuthApiError so every downstream check (code, message, status) sees
+ * the shape it expects. Built on demand, never at module scope: this module
+ * is server-only ('use server'), while `submit-auth.ts` also loads in the
+ * BROWSER (the auth page imports `submitAuthForm`), where a module-scope
+ * AuthApiError construction threw at module evaluation in a hardened
+ * environment (KRTX-4637: auth-js's tag assignment failed on the frozen
+ * instance that environment's `super()` produced) and took the auth page's
+ * whole submit machinery down with it.
+ */
+function timeoutAuthError(): AuthApiError {
+  return new AuthApiError(AUTH_TIMEOUT_MESSAGE, 503, 'timeout');
 }
 
 /**
@@ -261,7 +277,7 @@ export async function sendEmailCode(prevState: any, formData: FormData) {
       },
     }),
     AUTH_UPSTREAM_TIMEOUT_MS,
-    () => ({ data: { user: null, session: null }, error: AUTH_TIMEOUT_AUTH_ERROR }),
+    () => ({ data: { user: null, session: null }, error: timeoutAuthError() }),
   );
 
   if (error) {
@@ -349,7 +365,7 @@ export async function forgotPassword(_prevState: unknown, formData: FormData) {
       redirectTo: `${trustedWebOrigin(origin)}/auth/reset-password`,
     }),
     AUTH_UPSTREAM_TIMEOUT_MS,
-    () => ({ error: AUTH_TIMEOUT_AUTH_ERROR }),
+    () => ({ error: timeoutAuthError() }),
   );
 
   if (error) {
@@ -430,7 +446,7 @@ export async function signInWithPassword(prevState: any, formData: FormData) {
       password,
     }),
     AUTH_UPSTREAM_TIMEOUT_MS,
-    () => ({ data: { user: null, session: null }, error: AUTH_TIMEOUT_AUTH_ERROR }),
+    () => ({ data: { user: null, session: null }, error: timeoutAuthError() }),
   );
 
   if (error) {
@@ -551,7 +567,7 @@ export async function signUpWithPassword(prevState: any, formData: FormData) {
           options: { emailRedirectTo },
         }),
         AUTH_UPSTREAM_TIMEOUT_MS,
-        () => ({ data: { user: null, session: null }, error: AUTH_TIMEOUT_AUTH_ERROR }),
+        () => ({ data: { user: null, session: null }, error: timeoutAuthError() }),
       );
 
   const alreadyExists =
@@ -571,7 +587,7 @@ export async function signUpWithPassword(prevState: any, formData: FormData) {
       password,
     }),
     AUTH_UPSTREAM_TIMEOUT_MS,
-    () => ({ data: { user: null, session: null }, error: AUTH_TIMEOUT_AUTH_ERROR }),
+    () => ({ data: { user: null, session: null }, error: timeoutAuthError() }),
   );
 
   if (signInError) {
