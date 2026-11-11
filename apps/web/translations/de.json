@@ -26713,8 +26713,7 @@
     "menu": {
       "invite": "Personen zu {name} einladen",
       "leave": "{name} verlassen",
-      "invitePeople": "Personen einladen",
-      "more": "Mehr"
+      "invitePeople": "Personen einladen"
     },
     "roles": {
       "owner": {

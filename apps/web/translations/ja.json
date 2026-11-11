@@ -26713,8 +26713,7 @@
     "menu": {
       "invite": "{name} にメンバーを招待",
       "leave": "{name} から退出",
-      "invitePeople": "メンバーを招待",
-      "more": "その他"
+      "invitePeople": "メンバーを招待"
     },
     "roles": {
       "owner": {
