@@ -264,6 +264,9 @@ version (root `VERSION`): API, frontend, CLI and desktop release together as `vX
 Local secrets, test lanes and the PR loop: **[CONTRIBUTING.md](CONTRIBUTING.md)**. Issues and pull
 requests are welcome.
 
+`pnpm dev` needs access to the encrypted env files. No access? Run the web app and API against local
+Supabase instead: **[CONTRIBUTING.md → Run locally without Dotenv Armor access](CONTRIBUTING.md#run-locally-without-dotenv-armor-access)**.
+
 ---
 
 <div align="center">

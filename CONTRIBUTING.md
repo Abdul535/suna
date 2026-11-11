@@ -24,6 +24,117 @@ Tools every contributor needs:
 | `agent-browser` | current (`npm i -g agent-browser && agent-browser install`) | The browser for agents: UI verification and demo videos |
 | `ffmpeg` | libvpx + libx264 | `agent-browser record` (check with `agent-browser doctor`) |
 
+### Run locally without Dotenv Armor access
+
+`apps/api/.env` and `apps/web/.env` are encrypted. Without access to the Kortix Dotenv Armor
+team, `dotenvx` fails with `NO_TEAMS` and `pnpm dev` cannot decrypt them. An outside
+contributor can still run the web app and the API against local Supabase. Two gitignored
+`.env.local` files replace the encrypted ones. They hold only the local Supabase demo keys
+that `supabase start` prints on every machine.
+
+What works: sign-in, workspaces, settings, Customize, and every screen that reads the API.
+What does not: sandboxes and sessions (no `PLATINUM_API_KEY`), model calls, billing, GitHub,
+and email delivery.
+
+Needs Docker running, the [Supabase CLI](https://supabase.com/docs/guides/local-development),
+and `pnpm install` done once.
+
+1. Start local Supabase (the first start pulls images, a few minutes):
+
+   ```bash
+   (cd supabase && supabase start -x studio,imgproxy)
+   ```
+
+2. Write the two `.env.local` files from the running stack:
+
+   ```bash
+   eval "$(cd supabase && supabase status -o env | sed 's/^/export SB_/')"
+   cat > apps/api/.env.local <<EOF
+   ENV_MODE=local
+   KORTIX_LOCAL_DEV=1
+   INTERNAL_KORTIX_ENV=dev
+   PORT=8008
+   KORTIX_URL=http://localhost:8008
+   ALLOWED_SANDBOX_PROVIDERS=platinum
+   DATABASE_URL=${SB_DB_URL}
+   SUPABASE_URL=${SB_API_URL}
+   SUPABASE_SERVICE_ROLE_KEY=${SB_SERVICE_ROLE_KEY}
+   SUPABASE_JWT_SECRET=${SB_JWT_SECRET}
+   INTERNAL_SERVICE_KEY=local-flow-runner-internal-service-key
+   KORTIX_BILLING_INTERNAL_ENABLED=false
+   TUNNEL_SIGNING_SECRET=dev-local-tunnel-signing-secret-32chars
+   API_KEY_SECRET=dev-local-api-key-secret-please-32chars
+   SCHEDULER_ENABLED=false
+   EOF
+   cat > apps/web/.env.local <<EOF
+   NEXT_PUBLIC_BILLING_ENABLED=false
+   NEXT_PUBLIC_SUPABASE_URL=${SB_API_URL}
+   SUPABASE_URL=${SB_API_URL}
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=${SB_ANON_KEY}
+   NEXT_PUBLIC_BACKEND_URL=http://localhost:8008/v1
+   BACKEND_URL=http://localhost:8008/v1
+   NEXT_PUBLIC_APP_URL=http://localhost:3000
+   NEXT_PUBLIC_URL=http://localhost:3000
+   NEXT_PUBLIC_KORTIX_PERSONAL_CONTACT=false
+   EDGE_CONFIG=
+   EOF
+   ```
+
+3. Start the API in its own terminal. It reads only `apps/api/.env.local` and applies every
+   pending migration at boot (`[schema] Migrations complete.`):
+
+   ```bash
+   cd apps/api && pnpm dev:envfile
+   ```
+
+   Check it: `curl -s localhost:8008/v1/health` returns `"status":"ok"`.
+
+4. Start the web app in a second terminal. Call `next dev` directly: the `dev` script wraps
+   `dotenvx run`, which fails without the key.
+
+   ```bash
+   cd apps/web && set -a && source .env.local && set +a && pnpm exec next dev --port 3000
+   ```
+
+   The first load of a route compiles it, up to ~60 s.
+
+5. Create a user and a workspace. `POST /v1/projects/provision` needs managed Git and returns
+   `503` here, so the workspace row goes straight into the local database, as the local test
+   profile does (`tests/src/fixtures/database-project.ts`). Run from the repository root:
+
+   ```bash
+   eval "$(cd supabase && supabase status -o env | sed 's/^/SB_/')"
+   EMAIL=dev@example.test PASSWORD=dev-password-1
+   curl -sf -o /dev/null -X POST "$SB_API_URL/auth/v1/admin/users" \
+     -H "apikey: $SB_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SB_SERVICE_ROLE_KEY" -H 'content-type: application/json' \
+     -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\",\"email_confirm\":true}"
+   TOKEN=$(curl -sf -X POST "$SB_API_URL/auth/v1/token?grant_type=password" -H "apikey: $SB_ANON_KEY" -H 'content-type: application/json' \
+     -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')
+   ACCOUNT_ID=$(curl -sf -X POST localhost:8008/v1/accounts -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+     -d '{"name":"local-dev"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["account_id"])')
+   docker exec -i "$(docker ps --format '{{.Names}}' | grep -m1 supabase_db)" \
+     psql -U postgres -v ON_ERROR_STOP=1 -tA -v account="$ACCOUNT_ID" -v email="$EMAIL" <<'SQL'
+   WITH id AS (SELECT gen_random_uuid() AS v),
+   p AS (
+     INSERT INTO kortix.projects (project_id, account_id, name, repo_url, default_branch, manifest_path, status, metadata, split_pending)
+     SELECT id.v, :'account', 'local-dev', 'https://local.invalid/' || id.v || '.git', 'main', 'kortix.yaml', 'active',
+            '{"onboarding_completed_at":"2026-01-01T00:00:00.000Z"}', false
+     FROM id RETURNING project_id)
+   INSERT INTO kortix.project_members (account_id, project_id, user_id, project_role, granted_by)
+   SELECT :'account', p.project_id, u.id, 'manager', u.id FROM p, auth.users u WHERE u.email = :'email'
+   RETURNING project_id;
+   SQL
+   ```
+
+   The last command prints the workspace id.
+
+6. Open `http://localhost:3000/auth`, enter the email, click "Use a password instead", and
+   sign in with the password from step 5. Open the workspace at
+   `http://localhost:3000/workspaces/<workspace id>`.
+
+Stop: Ctrl-C both terminals, then `(cd supabase && supabase stop)`. The `.env.local` files are
+gitignored; `git status` stays clean.
+
 ## The pull request loop
 
 A pull request into `dev` runs **no** CI job by itself. Your development machine runs the
