@@ -24734,7 +24734,6 @@
     "endTime": "Endzeit",
     "overdue": "Überfällig",
     "status": {
-      "open": "Offen",
       "done": "Erledigt"
     },
     "comments": "{count, plural, one {# Kommentar} other {# Kommentare}}",
