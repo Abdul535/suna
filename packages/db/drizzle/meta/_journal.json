@@ -1772,6 +1772,13 @@
       "when": 1794677104435,
       "tag": "20261114172504_sandbox_templates_dockerfile_inline",
       "breakpoints": true
+    },
+    {
+      "idx": 253,
+      "version": "7",
+      "when": 1794679755268,
+      "tag": "20261114180915_calendar_item_people",
+      "breakpoints": true
     }
   ]
 }
